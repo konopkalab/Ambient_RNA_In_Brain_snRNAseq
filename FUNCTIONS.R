@@ -1,6 +1,9 @@
 # Ambient Marker Finder
 ambClusterFind = function(rawObj, finalCBs = NULL, ambCutoffCoef = 1.5, batchCorrect = T, timesExcess = 2, res = 0.5, npcs = 30, ncores = 8){
 
+	# This function finds the clusters enriched in empty droplets, calls them ambient clusters
+	# Then classifies cells as belonging to these clusters or not
+
 	if(batchCorrect == T & length(unique(rawObj$orig.ident)) == 1){
 		stop('Only one batch detected in orig.ident. Please set batchCorrect to False or add the batch information to orig.ident')
 	}
@@ -25,7 +28,7 @@ ambClusterFind = function(rawObj, finalCBs = NULL, ambCutoffCoef = 1.5, batchCor
 			rawSub = subset(rawObj, subset = orig.ident == samples[x])	
 			out = emptyDrops(rawSub@assays$RNA@counts)
 			out = out[!(is.na(out$FDR)), ]
-			out[out$FDR < 0.05,] %>% rownames
+			out[out$FDR < 0.01,] %>% rownames
 		})
 		finalCBs = unlist(cellsL)
 	}
@@ -43,10 +46,11 @@ ambClusterFind = function(rawObj, finalCBs = NULL, ambCutoffCoef = 1.5, batchCor
 		# Keep n times more than filtered
 		keepL = list()
 		rawMeta = rawObj@meta.data
+		samples = unique(rawObj$orig.ident)
 		for(i in 1:length(samples)){
 			rawMetaSub = rawMeta[rawMeta$orig.ident == samples[i],]
 			rawMetaSubFinalCount = sum(rawMetaSub$is_empty == 'Non_empty')
-			keepMax = max(rawMetaSubFinalCount * timesExcess, nrow(rawMetaSub))
+			keepMax = min(rawMetaSubFinalCount * timesExcess, nrow(rawMetaSub))
 			keepL[[i]] = rawMetaSub[order(rawMetaSub$nCount_RNA, decreasing = T)[1:keepMax], ] %>% rownames
 		}
 
@@ -96,10 +100,15 @@ ambClusterFind = function(rawObj, finalCBs = NULL, ambCutoffCoef = 1.5, batchCor
 
 ambMarkFind = function(seuratObject, intronicCutoff = c(0.5, 0.7), sorted = F, type, logfc = 0.25){
 
+	# This function finds the genes overrepresented in ambient clusters.
+	# If sorted = F, ambient clusters are split into high and low intronic read ratio
+	# and the function returns two vectors of ambient markers for each.
+
 	## Find Ambient Cluster Markers
 	if(sorted == F){
 
 		ambientObj = subset(seuratObject, subset = is_ambient_cluster == 'Ambient')
+
 		ambientMeta = ambientObj@meta.data
 
 		# Find high intronic and low intronic ambient cell barcodes

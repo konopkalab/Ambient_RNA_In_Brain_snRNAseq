@@ -11,8 +11,9 @@ source('FUNCTIONS.R')
 ## STEP 00: DOWNLOAD DATASETS
 ####
 
-# Raw count matrix (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/WaNwndJmoG7TYwJ
-# Glial cells after running CellBender (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/krMDmEowmKcp6Hj
+# Raw count matrix (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/dqDoqLYRxKH7EgS
+# Glial cells after running CellBender (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/aED6kzCGAzabq4d
+# Barcodes determined as real nuclei by the original study: https://cloud.biohpc.swmed.edu/index.php/s/9pzxgC5TCaL6oTA
 
 ####
 ## STEP 01: LOAD RAW COUNT MATRIX AND CALCULATE INTRONIC READ RATIO
@@ -28,14 +29,11 @@ source('FUNCTIONS.R')
 # Use dropletQC to calculate nuclear fraction (i.e intronic read ratio)
 
 # Load the raw seurat object (without cell calling)
-sampObj = readRDS('seurat_raw.RDS')
-
-# Subset a sample
-#sampObj = subset(sampObj, subset = orig.ident %in% c('SRR9262946'))
+sampObj = readRDS('seurat_raw_intRatio_subset_for_github.RDS')
 
 # Set the paths for the nuclear fraction function
-gtfPath = '~/workdir/reference_genomes/cellranger_reference_ATAC/Hsa_GRCh38/HomSap_GRCh38/genes/genes.gtf'
-bamPath = '~/workShared/ForEmre/'
+gtfPath = 'hg38_genes.gtf'
+bamPath = '~/working_dir/BamDir'
 
 # Loop over samples and calculate nuclear fraction per cell barcode
 samps = unique(sampObj$orig.ident)
@@ -83,8 +81,11 @@ dev.off()
 # Keep cells with at least 1 UMI. This shouldn't filter anything for most datasets.
 sampObj = subset(sampObj, subset = nCount_RNA > 0)
 
+# Load the final filtered cell barcodes
+finalBarcs = readRDS('finalBarcs.RDS')
+
 # Find non-empty cell barcodes and ambient clusters
-sampObjAmb = ambClusterFind(sampObj, batchCorrect = T)
+sampObjAmb = ambClusterFind(sampObj, batchCorrect = T, finalCBs = finalBarcs)
 
 # Run UMAP to visualize ambient clusters
 sampObjAmb = RunUMAP(sampObjAmb, dims = 1:30)
@@ -116,23 +117,28 @@ dev.off()
 # One data frame for low, one for high intronic cell barcodes.
 # We are setting the logfc low since ambient clusters have many dropouts, reducing the fold change.
 
-abundanceL = ambMarkFind(sampObjAmb, sorted = F, type = 'Markers', logfc = 0.1)
-highMarks = abundanceL[["High_Intronic_Ambient_Markers"]]
-lowMarks = abundanceL[["Low_Intronic_Ambient_Markers"]]
+markersL = ambMarkFind(sampObjAmb, sorted = F, type = 'Markers', logfc = 0.1, intronicCutoff = c(0.5, 0.7))
 
-# Keep the significant markers
-highMarks = highMarks[highMarks$p_val_adj < 0.05,] %>% rownames
-lowMarks = lowMarks[lowMarks$p_val_adj < 0.05,] %>% rownames
+# Keep the significant markers. Using unadjusted p-value since the sample size is low.
+highMarks = markersL[["High_Intronic_Ambient_Markers"]]
+lowMarks = markersL[["Low_Intronic_Ambient_Markers"]]
+highMarks = highMarks[highMarks$p_val < 0.05,] %>% rownames
+lowMarks = lowMarks[lowMarks$p_val < 0.05,] %>% rownames
 
-ambGenes = union(highMarks, lowMarks)
+# Alternatively, it is possible to find the most abundant genes in high intronic ambient RNAs and low intronic ambient RNAs
+abundanceL = ambMarkFind(sampObjAmb, sorted = F, type = 'Abundance',  intronicCutoff = c(0.5, 0.7))
+
+highMarks = abundanceL[["High_Intronic_Ambient_GeneAbundance"]] %>% sort %>% tail(100) %>% names
+lowMarks = abundanceL[["Low_Intronic_Ambient_GeneAbundance"]] %>% sort %>% tail(100) %>% names
 
 # Save ambient genes
+ambGenes = union(highMarks, lowMarks)
 saveRDS(ambGenes, 'ambGenes.RDS')
 
 # Find percentage of the ambient RNA marker genes per cell barcode
 sampObjAmb[["percent_ambient_highIntronic"]] = PercentageFeatureSet(object = sampObjAmb, features = highMarks)
 pdf('High_Intronic_Ambient_Percentage_Across_Annotations.pdf')
-ggboxplot(sampObjAmb[[]], x = 'seurat_clusters', y = 'percent_ambient_highIntronic', outlier.shape = NA, ylim = c(0,30)) +
+ggboxplot(sampObjAmb[[]], x = 'seurat_clusters', y = 'percent_ambient_highIntronic', outlier.shape = NA, ylim = c(0,50)) +
 xlab('') + ylab('Nuclear Ambient Marker Percentage') +
 theme(text=element_text(size=20, face = 'bold')) +
 rotate_x_text(90)
@@ -140,11 +146,20 @@ dev.off()
 
 sampObjAmb[["percent_ambient_LowIntronic"]] = PercentageFeatureSet(object = sampObjAmb, features = lowMarks)
 pdf('Low_Intronic_Ambient_Percentage_Across_Annotations.pdf')
-ggboxplot(sampObjAmb[[]], x = 'seurat_clusters', y = 'percent_ambient_LowIntronic', outlier.shape = NA, ylim = c(0,30)) +
+ggboxplot(sampObjAmb[[]], x = 'seurat_clusters', y = 'percent_ambient_LowIntronic', outlier.shape = NA, ylim = c(0,50)) +
 xlab('') + ylab('Non-nuclear Ambient Marker Percentage') +
 theme(text=element_text(size=20, face = 'bold')) +
 rotate_x_text(90)
 dev.off()
+
+# Intronic read ratio should be low in the clusters with high low-intronic ambient marker percentage
+pdf('Intronic_Read_Ratio_Across_Annotations.pdf')
+ggboxplot(sampObjAmb[[]], x = 'seurat_clusters', y = 'intronRat', outlier.shape = NA, ylim = c(0,1)) +
+xlab('') + ylab('Intronic_Read_Ratio') +
+theme(text=element_text(size=20, face = 'bold')) +
+rotate_x_text(90)
+dev.off()
+
 
 ####
 ## STEP 05: RUN CELLBENDER
@@ -194,13 +209,15 @@ saveRDS(seurmerg, 'CELLBENDER/seurat_combined_cellbender.RDS')
 # The user can then determine which subclusters to remove.
 
 # Read the seurat object that contains glial cell types.
-afterCB = readRDS('NSD1_CellBender_Glia.RDS')
+afterCB = readRDS('NSD1_CellBender_Glia_Subset_IntronicRatio.RDS')
 
-# Run the subcluster clean function
+# Run the subcluster clean function. Using low intronic ambients as contamination markers.
 afterCB_AmbientMarked = subCLEAN(object = afterCB, group.by = 'cluster',
-		key = 'Oligodendrocytes', ambientMarkers = ambGenes, batchCorrect = T)
+		key = 'Microglia', ambientMarkers = ambGenes, batchCorrect = T)
 
 # The function returns two values; seurat object with subclustering info...
 # and a table of subcluster enrichment with ambient RNA markers
+
+
 
 
