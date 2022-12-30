@@ -1,14 +1,11 @@
 # Ambient_RNA_In_Brain_snRNAseq
 
-**STEPWISE SCRIPTS**
+**MAIN SCRIPTS**
 
-Steps_1_4.R : Find ambient RNA marker genes.
+Tutorial_NSD1.R: Stepwise guideline of ambient RNA removal related steps using NSD1 dataset.
 \
 \
-Steps_5.sh : Run CellBender.
-\
-\
-Steps_6_9.R : Annotate after CellBender and clean subclusters using ambient RNA marker enrichment.
+Functions.R: Contains 3 functions related to ambient RNA removal (see the tutorial for their usage).
 \
 \
 \
@@ -23,6 +20,8 @@ OPC_OL_Trajectory_SD1.R : Oligodendrocyte lineage trajectory analyses of SD1 dat
 OPC_subclustering.R: Subclustering and re-annotation of OPCs across datasets.
 \
 \
+Comparison_of_ambient_removal_tools.R: Compares ambient RNA marker percentage after ambient RNA removal tools are applied across different datasets.
 \
-Do not hesitate to contact me if you have any questions:
+\
+Please do not hesitate to contact me if you have any questions:
 emre.caglayan@utsouthwestern.edu
