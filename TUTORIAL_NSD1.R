@@ -11,9 +11,9 @@ source('FUNCTIONS.R')
 ## STEP 00: DOWNLOAD DATASETS
 ####
 
-# Raw count matrix (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/dqDoqLYRxKH7EgS
-# Glial cells after running CellBender (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/aED6kzCGAzabq4d
-# Barcodes determined as real nuclei by the original study: https://cloud.biohpc.swmed.edu/index.php/s/9pzxgC5TCaL6oTA
+# Raw count matrix (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/D4QW4PQqPgCQfZ6
+# Glial cells after running CellBender (NSD1): https://cloud.biohpc.swmed.edu/index.php/s/Bmy5HLqkaZP6sJg
+# Barcodes determined as real nuclei by the original study: https://cloud.biohpc.swmed.edu/index.php/s/27bp8S7rkKb5rcy
 
 ####
 ## STEP 01: LOAD RAW COUNT MATRIX AND CALCULATE INTRONIC READ RATIO
